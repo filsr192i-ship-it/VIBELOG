@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-// Default LEGO minifigure silhouette avatar matching user request
+// Default LEGO minifigure silhouette avatar
 const DEFAULT_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <rect width="200" height="200" fill="#cad4e6"/>
@@ -26,7 +26,13 @@ export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // --- 알고리즘 및 피드 정렬/필터링 상태 ---
+  // Email verification state
+  const [verificationCodeInput, setVerificationCodeInput] = useState('');
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+
+  // Sorting and filter state
   const [sortMode, setSortMode] = useState('trending'); // 'trending' | 'foryou' | 'latest' | 'popular'
   const [selectedTag, setSelectedTag] = useState('전체');
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,12 +46,12 @@ export default function App() {
     }
   ]);
   const [naviesInput, setNaviesInput] = useState('');
-  const [naviesImage, setNaviesImage] = useState(null); // { base64, mimeType, previewUrl }
+  const [naviesImage, setNaviesImage] = useState(null);
   const [isNaviesLoading, setIsNaviesLoading] = useState(false);
 
   // Post creation state
   const [content, setContent] = useState('');
-  const [mediaList, setMediaList] = useState([]); // array of { url, type, name }
+  const [mediaList, setMediaList] = useState([]);
   const [commentInputs, setCommentInputs] = useState({});
 
   // Profile Edit Modal state
@@ -186,8 +192,7 @@ export default function App() {
     const hoursAgo = Math.max(0, (Date.now() - postTime) / (1000 * 60 * 60));
 
     const gravity = 1.5;
-    const score = engagement / Math.pow(hoursAgo + 2, gravity);
-    return score;
+    return engagement / Math.pow(hoursAgo + 2, gravity);
   };
 
   const calculatePersonalizedScore = (post, currentUser) => {
@@ -216,9 +221,7 @@ export default function App() {
     });
 
     const totalInteractions = Object.keys(userInterestTags).length || 1;
-    const matchPercentage = Math.min(100, Math.round((matchPoints / (totalInteractions * 20)) * 100));
-
-    return matchPercentage;
+    return Math.min(100, Math.round((matchPoints / (totalInteractions * 20)) * 100));
   };
 
   const getProcessedPosts = () => {
@@ -258,7 +261,7 @@ export default function App() {
       {
         id: 'user_dev',
         email: 'official@vibelog.com',
-        password: '1234',
+        password: 'Password123!',
         name: '바이브로그 Official',
         bio: '공식 바이브로그 계정입니다. 일상의 모든 분위기를 나누세요 ✨',
         avatar: DEFAULT_AVATAR
@@ -266,7 +269,7 @@ export default function App() {
       {
         id: 'user_fashion',
         email: 'fashion@vibelog.com',
-        password: '1234',
+        password: 'Password123!',
         name: '스타일링마스터',
         bio: '트렌디한 데일리룩과 퍼스널컬러 스타일링 연구소 👗',
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
@@ -303,7 +306,71 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage('');
-    }, 3000);
+    }, 4500);
+  };
+
+  const validatePassword = (pwd) => {
+    if (pwd.length < 6) {
+      return '비밀번호는 최소 6자리 이상이어야 합니다.';
+    }
+    const hasLetter = /[a-zA-Z]/.test(pwd);
+    const hasNumber = /[0-9]/.test(pwd);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
+
+    if (!hasLetter || !hasNumber || !hasSpecial) {
+      return '비밀번호는 영문자, 숫자, 특수문자(!@#$%^&* 등)를 모두 포함해야 합니다.';
+    }
+    return null;
+  };
+
+  const handleSendVerificationCode = () => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail) {
+      showToast('⚠️ 인증 메일을 보낼 이메일 주소를 입력해주세요.');
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
+      showToast('⚠️ 올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
+    const pwdError = validatePassword(cleanPassword);
+    if (pwdError) {
+      showToast(`⚠️ ${pwdError}`);
+      return;
+    }
+
+    const existingUser = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (existingUser) {
+      showToast('⚠️ 이미 등록된 이메일입니다. 로그인 페이지에서 로그인해주세요.');
+      setIsSignUp(false);
+      return;
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedCode(code);
+    setIsCodeSent(true);
+    setIsEmailVerified(false);
+    setVerificationCodeInput('');
+
+    showToast(`📩 ${cleanEmail} (으)로 6자리 인증 코드가 발송되었습니다! 이메일함을 확인하고 6자리 코드를 입력해 주세요.`);
+  };
+
+  const handleVerifyCode = () => {
+    if (!verificationCodeInput.trim()) {
+      showToast('⚠️ 이메일로 발송된 6자리 인증번호를 입력해주세요.');
+      return;
+    }
+
+    if (verificationCodeInput.trim() === generatedCode) {
+      setIsEmailVerified(true);
+      showToast('✅ 이메일 인증이 완료되었습니다! 가입 완료 버튼을 눌러 가입을 진행해주세요.');
+    } else {
+      showToast('❌ 인증번호가 일치하지 않습니다. 이메일로 받은 6자리 코드를 다시 확인해 주세요.');
+    }
   };
 
   const handleAuth = (e) => {
@@ -317,8 +384,14 @@ export default function App() {
     }
 
     if (isSignUp) {
-      if (cleanPassword.length < 4) {
-        showToast('비밀번호는 최소 4자 이상 입력해야 합니다.');
+      const pwdError = validatePassword(cleanPassword);
+      if (pwdError) {
+        showToast(`⚠️ ${pwdError}`);
+        return;
+      }
+
+      if (!isEmailVerified) {
+        showToast('⚠️ 입력하신 이메일로 발송된 6자리 인증 코드를 확인 후 인증을 완료해주세요.');
         return;
       }
 
@@ -344,38 +417,33 @@ export default function App() {
       setRegisteredUsers(updatedUsers);
       localStorage.setItem('vibelog_registered_users', JSON.stringify(updatedUsers));
 
-      setUser(newUser);
-      localStorage.setItem('vibelog_user', JSON.stringify(newUser));
-      showToast(`회원가입 완료! ${newUser.name}님 환영합니다 🎉`);
+      setEmail('');
+      setPassword('');
+      setUserNameInput('');
+      setIsSignUp(false);
+      setIsCodeSent(false);
+      setIsEmailVerified(false);
+      setGeneratedCode('');
+      setVerificationCodeInput('');
+
+      showToast(`🎉 회원가입이 성공적으로 완료되었습니다! 가입하신 이메일(${newUser.email})과 비밀번호로 로그인해주세요.`);
     } else {
       const foundUser = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
       
       if (!foundUser) {
-        showToast('등록되지 않은 계정입니다. 회원가입을 먼저 진행해주세요.');
+        showToast('❌ 등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.');
         return;
       }
 
       if (foundUser.password !== cleanPassword) {
-        showToast('비밀번호가 올바르지 않습니다. 다시 확인해 주세요.');
+        showToast('❌ 비밀번호가 올바르지 않습니다. 다시 확인해 주세요.');
         return;
       }
 
       const activeUser = { ...foundUser, isGuest: false };
       setUser(activeUser);
       localStorage.setItem('vibelog_user', JSON.stringify(activeUser));
-      showToast(`로그인 성공! ${activeUser.name}님 환영합니다 ✨`);
-    }
-  };
-
-  const handleQuickLogin = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    const foundUser = registeredUsers.find((u) => u.email.toLowerCase() === demoEmail.toLowerCase());
-    if (foundUser) {
-      const activeUser = { ...foundUser, isGuest: false };
-      setUser(activeUser);
-      localStorage.setItem('vibelog_user', JSON.stringify(activeUser));
-      showToast(`${activeUser.name} 계정으로 로그인되었습니다!`);
+      showToast(`✨ 로그인 성공! ${activeUser.name}님 환영합니다.`);
     }
   };
 
@@ -442,7 +510,6 @@ export default function App() {
     setIsNaviesLoading(true);
 
     try {
-      // 환경변수에서 API 키를 읽어옵니다.
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
       
       if (!apiKey) {
@@ -797,30 +864,38 @@ export default function App() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: bg, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', fontFamily: 'sans-serif' }}>
         {toastMessage && (
-          <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#18181b', color: '#ffffff', padding: '10px 18px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', zIndex: 200, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+          <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#18181b', color: '#ffffff', padding: '12px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', zIndex: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.25)', maxWidth: '90%', textAlign: 'center' }}>
             {toastMessage}
           </div>
         )}
 
-        <div style={{ backgroundColor: cardBg, border: borderStyle, borderRadius: '20px', padding: '32px 28px', width: '100%', maxWidth: '400px', boxShadow: '0 15px 35px rgba(0,0,0,0.12)' }}>
+        <div style={{ backgroundColor: cardBg, border: borderStyle, borderRadius: '20px', padding: '32px 28px', width: '100%', maxWidth: '420px', boxShadow: '0 15px 35px rgba(0,0,0,0.12)' }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <h1 style={{ fontSize: '26px', fontWeight: '800', margin: '0 0 6px 0', color: '#3b82f6' }}>✨ VIBELOG</h1>
             <p style={{ fontSize: '13px', color: subText, margin: 0 }}>
-              {isSignUp ? '새 계정을 만들고 감성을 나누어보세요' : '일상의 감성을 공유하는 소셜 커뮤니티'}
+              {isSignUp ? '이메일 인증 후 새 계정을 생성합니다' : '일상의 감성을 공유하는 소셜 커뮤니티'}
             </p>
           </div>
 
           <div style={{ display: 'flex', backgroundColor: inputBg, borderRadius: '10px', padding: '4px', marginBottom: '20px' }}>
             <button
               type="button"
-              onClick={() => { setIsSignUp(false); setEmail(''); setPassword(''); }}
+              onClick={() => {
+                setIsSignUp(false);
+                setIsCodeSent(false);
+                setIsEmailVerified(false);
+              }}
               style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: !isSignUp ? cardBg : 'transparent', color: text, fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', boxShadow: !isSignUp ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
             >
               로그인
             </button>
             <button
               type="button"
-              onClick={() => { setIsSignUp(true); setEmail(''); setPassword(''); }}
+              onClick={() => {
+                setIsSignUp(true);
+                setIsCodeSent(false);
+                setIsEmailVerified(false);
+              }}
               style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: isSignUp ? cardBg : 'transparent', color: text, fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', boxShadow: isSignUp ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
             >
               회원가입
@@ -844,22 +919,98 @@ export default function App() {
 
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: subText, display: 'block', marginBottom: '4px' }}>이메일 주소</label>
-              <input
-                type="email"
-                placeholder="example@vibelog.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={inputStyle}
-                required
-              />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="email"
+                  placeholder="example@vibelog.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (isSignUp) {
+                      setIsEmailVerified(false);
+                      setIsCodeSent(false);
+                    }
+                  }}
+                  style={{ ...inputStyle, flex: 1 }}
+                  required
+                />
+                {isSignUp && (
+                  <button
+                    type="button"
+                    onClick={handleSendVerificationCode}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: isEmailVerified ? '#10b981' : '#6366f1',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {isEmailVerified ? '✓ 인증됨' : isCodeSent ? '재발송' : '인증번호 발송'}
+                  </button>
+                )}
+              </div>
             </div>
 
+            {isSignUp && isCodeSent && (
+              <div style={{ backgroundColor: isDark ? '#1f2937' : '#eff6ff', padding: '12px', borderRadius: '10px', border: '1px solid #3b82f6' }}>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '4px' }}>
+                  📩 이메일 6자리 인증코드 입력
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="6자리 인증코드 입력"
+                    value={verificationCodeInput}
+                    onChange={(e) => setVerificationCodeInput(e.target.value)}
+                    disabled={isEmailVerified}
+                    style={{ ...inputStyle, letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={isEmailVerified}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: isEmailVerified ? '#10b981' : '#2563eb',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: isEmailVerified ? 'default' : 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {isEmailVerified ? '확인 완료' : '인증 확인'}
+                  </button>
+                </div>
+                {isCodeSent && !isEmailVerified && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#2563eb' }}>
+                    📬 {email} (으)로 6자리 인증 코드를 발송했습니다. 이메일 수신함(또는 스팸함)을 확인 후 입력해 주세요.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 'bold', color: subText, display: 'block', marginBottom: '4px' }}>비밀번호</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: subText }}>비밀번호</label>
+                {isSignUp && (
+                  <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold' }}>
+                    * 영문 + 숫자 + 특수문자 6자 이상
+                  </span>
+                )}
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="•••••••• (4자 이상)"
+                  placeholder={isSignUp ? "영문/숫자/특수문자 조합 6자 이상" : "••••••••"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ ...inputStyle, paddingRight: '40px' }}
@@ -875,34 +1026,21 @@ export default function App() {
               </div>
             </div>
 
-            <button type="submit" style={{ ...btnStyle, marginTop: '8px', padding: '12px', fontSize: '14px' }}>
-              {isSignUp ? '✨ 새 계정 가입 완료' : '🚀 로그인'}
+            <button
+              type="submit"
+              disabled={isSignUp && !isEmailVerified}
+              style={{
+                ...btnStyle,
+                marginTop: '8px',
+                padding: '12px',
+                fontSize: '14px',
+                backgroundColor: isSignUp && !isEmailVerified ? '#9ca3af' : '#3b82f6',
+                cursor: isSignUp && !isEmailVerified ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isSignUp ? (isEmailVerified ? '✨ 회원가입 완료' : '🔒 이메일 인증 필요') : '🚀 로그인'}
             </button>
           </form>
-
-          {!isSignUp && (
-            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: borderStyle }}>
-              <p style={{ fontSize: '11px', color: subText, fontWeight: 'bold', margin: '0 0 8px 0', textAlign: 'center' }}>⚡ 원클릭 체험용 샘플 계정</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin('official@vibelog.com', '1234')}
-                  style={{ padding: '8px 12px', borderRadius: '8px', border: borderStyle, backgroundColor: inputBg, color: text, fontSize: '12px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <span>👑 공식 계정</span>
-                  <span style={{ fontSize: '10px', color: subText }}>official@vibelog.com</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin('fashion@vibelog.com', '1234')}
-                  style={{ padding: '8px 12px', borderRadius: '8px', border: borderStyle, backgroundColor: inputBg, color: text, fontSize: '12px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <span>👗 패션 크리에이터 계정</span>
-                  <span style={{ fontSize: '10px', color: subText }}>fashion@vibelog.com</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           <div style={{ margin: '16px 0', height: '1px', backgroundColor: isDark ? '#27272a' : '#e4e4e7' }} />
 
@@ -1382,7 +1520,7 @@ export default function App() {
         </div>
       )}
 
-      {/* NAVIES AI Chatbot Modal */}
+      {}
       {showNaviesModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '16px' }}>
           <div style={{ backgroundColor: cardBg, color: text, border: borderStyle, borderRadius: '20px', width: '100%', maxWidth: '520px', height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
